@@ -1,0 +1,8 @@
+datasets
+faiss-cpu
+numpy
+pandas
+scikit-learn
+torch
+tqdm
+transformers

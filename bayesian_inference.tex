@@ -1,0 +1,45 @@
+
+\subsection{Deriving the Label Repair Equation via Bayes' Theorem}
+\label{sec:prof}
+
+This section aims to demonstrate the derivation of Eq.~\ref{eq:bayes_applied} from Eq.~\ref{eq:repaired_label_estimation}. 
+Specifically, from the fundamental definition of conditional probability, we have:
+\begin{equation}
+    P(y \mid x, \tilde{y}) = \frac{P(y, x, \tilde{y})}{P(x, \tilde{y})}
+    \label{eq:fundamental_conditional_probability}
+\end{equation}
+%
+%
+Using the chain rule of probability, we can decompose the joint probability in the numerator of Eq.~\ref{eq:fundamental_conditional_probability} as:
+    $P(y, x, \tilde{y}) = P(\tilde{y} \mid y, x) \cdot P(y, x)$. 
+    %
+We can further decompose the term $P(y, x)$ into: $P(y, x) = P(y \mid x) \cdot P(x)$.
+%
+Substituting this back into the numerator's decomposition gives:
+\begin{equation}
+    P(y, x, \tilde{y}) = P(\tilde{y} \mid y, x) \cdot P(y \mid x) \cdot P(x)
+    \label{eq:numerator}
+\end{equation}
+%
+%
+Similarly, the joint probability in the denominator of Eq~\ref{eq:fundamental_conditional_probability} can be expressed as:
+\begin{equation}
+    P(x, \tilde{y}) = P(\tilde{y} \mid x) \cdot P(x)
+    \label{eq:denominator_base}
+\end{equation}
+By substituting the expanded forms from Eq. \ref{eq:numerator} and Eq. \ref{eq:denominator_base} back into the original formula Eq.~\ref{eq:fundamental_conditional_probability}, we get:
+\begin{equation}
+    P(y \mid x, \tilde{y}) = \frac{P(\tilde{y} \mid y, x) \cdot P(y \mid x) \cdot P(x)}{P(\tilde{y} \mid x) \cdot P(x)} = \frac{P(\tilde{y} \mid y, x) \cdot P(y \mid x)}{P(\tilde{y} \mid x)}
+    \label{eq:bayes_full}
+\end{equation}
+Eq.~\ref{eq:bayes_full} is the classic form of Bayes' theorem applied to our context. The term $P(\tilde{y} \mid x)$ in the denominator is the evidence, which acts as a normalization constant. It can be calculated by marginalizing the numerator over all possible clean labels $k \in \{1, \dots, C\}$:
+\begin{equation}
+    P(\tilde{y} \mid x) = \sum_{k=1}^{C} P(\tilde{y} \mid y=k, x) \cdot P(y=k \mid x)
+\end{equation}
+When our goal is to find the label $y^*$ that maximizes the posterior probability (as defined in Eq. \ref{eq:repaired_label_estimation}), the denominator $P(\tilde{y} \mid x)$ has the same value for every candidate class $y$. Therefore, for the purpose of the $\arg\max$ operation, this constant term can be disregarded. This simplifies our problem to finding the maximum of the numerator, leading to the following proportionality relationship:
+\begin{equation}
+    P(y \mid x, \tilde{y}) \propto P(\tilde{y} \mid y, x) \cdot P(y \mid x)
+    \label{eq:bayes_proportional}
+\end{equation}
+Eq.~\ref{eq:bayes_proportional} is the cornerstone of our correction pipeline. It states that the posterior probability of a clean label is proportional to the product of two key terms: the likelihood of observing the noisy label $\tilde{y}$ given the clean label $y$ and features $x$, and the prior probability of the clean label $y$ given $x$. 
+

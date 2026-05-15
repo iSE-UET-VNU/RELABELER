@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "relabeler"
+version = "0.1.0"
+description = "Relabeler label noise detection and correction pipeline."
+requires-python = ">=3.10"
+dependencies = [
+    "datasets",
+    "faiss-cpu",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "torch",
+    "tqdm",
+    "transformers",
+]
+
+[tool.setuptools]
+py-modules = ["cli"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+relabeler = "cli:main"
