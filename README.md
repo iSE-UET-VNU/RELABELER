@@ -1,16 +1,17 @@
 # RELABELER: A Data-Centric Framework for Detecting and Correcting Corrupted Labels
-RELABELER is an end-to-end, data-centric framework for detecting and correcting corrupted labels. 
+RELABELER is an end-to-end, data-centric framework for detecting and correcting corrupted labels. RELABELER jointly leverages local and global relationships among data instances to identify suspicious samples, and further repairs corrupted labels by estimating the most probable clean label based on both input features and observed noisy labels.
+Extensive experiments across diverse datasets, noise types, and noise rates demonstrate that RELABELER consistently improves label correction quality and enhances downstream model performance, while also complementing existing noise detection approaches.
 
 ## Architecture
 <img width="1195" height="617" alt="Ảnh màn hình 2026-05-15 lúc 22 24 25" src="https://github.com/user-attachments/assets/3251c34c-2360-4a69-b2a9-dbcd35673cde" />
 
-The figure shows the overview of RELABELER, which consists of two main phases: (i) corrupted label detection and (ii) corrupted label correction.
+The figure shows the overview of RELABELER, which consists of two main phases: _(i) corrupted label detection_ and _(ii) corrupted label correction_.
 
 For corrupted label detection, RELABELER jointly leverages both local and global relationships among data instances to identify potentially noisy samples. 
 
 After detecting suspicious instances, RELABELER further performs label correction by estimating the most probable clean label for each instance based on both its input features and observed noisy label.
 
-#### Deriving the Label Repair Equation via Bayes' Theorem
+### Deriving the Label Repair Equation via Bayes' Theorem
 
 This section demonstrates how RELABELER derives the label repair equation used in the correction phase from Bayes' theorem.
 
