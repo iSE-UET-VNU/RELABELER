@@ -59,129 +59,71 @@ def _embedding_from_outputs(outputs, attention_mask=None, output_attr: str | Non
     return outputs.last_hidden_state.mean(dim=1)
 
 
-def extract_img_embedding(
-    dataset_name: str,
-    batch_size: int = 32,
-    encode_model: str = DEFAULT_IMAGE_MODEL,
-    output_dir: str | Path = ".",
-    splits: tuple[str, ...] = ("train", "test"),
-    image_column: str = "image",
-    label_column: str = "label",
-    device: str | torch.device | None = None,
-):
-    """Extract image embeddings from any Hugging Face image dataset.
-
-    Defaults to CLIP for image encoding. Dataset-specific schemas are handled
-    through ``image_column`` and ``label_column`` instead of hard-coded dataset
-    names.
-    """
-    device = get_device(str(device) if device else None)
-    dataset = load_dataset(dataset_name)
-    processor = AutoImageProcessor.from_pretrained(encode_model)
-    model = AutoModel.from_pretrained(encode_model).to(device)
-    model.eval()
-
-    def embed_img_batch(batch_images):
-        inputs = processor(images=batch_images, return_tensors="pt")
-        inputs = {key: value.to(device) for key, value in inputs.items()}
-        with torch.no_grad():
-            outputs = model(**inputs)
-        embeddings = _embedding_from_outputs(outputs, output_attr="image_embeds")
-        return embeddings.cpu().numpy()
-
-    split_specs = {}
-    all_labels = []
-    for split_name in splits:
-        split_data = dataset[split_name]
-        if len(split_data) == 0:
-            raise ValueError(f"Split '{split_name}' is empty.")
-
-        sample = split_data[0]
-        resolved_image_column = _resolve_column(sample, image_column, fallbacks=("img",))
-        resolved_label_column = _resolve_column(sample, label_column)
-        labels = [ex[resolved_label_column] for ex in split_data]
-        split_specs[split_name] = (split_data, resolved_image_column, labels)
-        all_labels.extend(labels)
-
-    _, class_labels = encode_labels(all_labels)
-
-    def process_split(split_name):
-        split_data, resolved_image_column, labels = split_specs[split_name]
-
-        images = [ex[resolved_image_column] for ex in split_data]
-        encoded_labels, _ = encode_labels(labels, class_labels=class_labels)
-
-        all_embeddings = []
-        for i in tqdm(range(0, len(images), batch_size), desc=f"Processing {split_name}"):
-            batch_images = images[i : i + batch_size]
-            all_embeddings.append(embed_img_batch(batch_images))
-
-        return np.vstack(all_embeddings), encoded_labels
-
-    save_path = get_save_path(dataset_name, encode_model, output_dir)
-    save_label_mapping(save_path / "label_mapping.json", class_labels)
-    outputs = {}
-    for split in splits:
-        embeddings, labels = process_split(split)
-        np.save(save_path / f"features_{split}.npy", embeddings)
-        np.save(save_path / f"labels_{split}.npy", labels)
-        outputs[split] = (embeddings, labels)
-
-    return outputs
-
-
-def embed_hf_image_split(
-    dataset_name: str,
+def embed_csv_images(
+    csv_file_path: str | Path,
     output_dir: str | Path,
-    split: str = "train",
-    model_name: str = DEFAULT_IMAGE_MODEL,
-    image_column: str = "image",
+    image_path_column: str = "image_path",
     label_column: str = "label",
+    model_name: str = DEFAULT_IMAGE_MODEL,
     batch_size: int = 32,
     output_prefix: str = "clip",
     device: str | torch.device | None = None,
 ):
     device = get_device(str(device) if device else None)
     output_dir = ensure_dir(output_dir)
-    dataset = load_dataset(dataset_name)
-    split_data = dataset[split]
-    if len(split_data) == 0:
-        raise ValueError(f"Split '{split}' is empty.")
+    csv_file_path = Path(csv_file_path)
 
-    sample = split_data[0]
-    resolved_image_column = _resolve_column(sample, image_column, fallbacks=("img",))
-    resolved_label_column = _resolve_column(sample, label_column)
-
-    images = [ex[resolved_image_column] for ex in split_data]
-    labels, class_labels = encode_labels([ex[resolved_label_column] for ex in split_data])
+    df = pd.read_csv(csv_file_path)
+    df = df.dropna(subset=[image_path_column, label_column]).reset_index(drop=True)
+    labels, class_labels = encode_labels(df[label_column].to_numpy())
 
     processor = AutoImageProcessor.from_pretrained(model_name)
     model = AutoModel.from_pretrained(model_name).to(device)
     model.eval()
 
-    def embed_img_batch(batch_images):
-        inputs = processor(images=batch_images, return_tensors="pt")
+    def resolve_image_path(raw_path: str) -> Path:
+        image_path = Path(raw_path)
+        if image_path.is_absolute():
+            return image_path
+        return csv_file_path.parent / image_path
+
+    def load_images(paths: list[str]):
+        from PIL import Image
+
+        images = []
+        for raw_path in paths:
+            image_path = resolve_image_path(raw_path)
+            if not image_path.exists():
+                raise FileNotFoundError(f"Image file not found: {image_path}")
+            with Image.open(image_path) as image:
+                images.append(image.convert("RGB"))
+        return images
+
+    def embed_image_batch(batch_paths: list[str]):
+        images = load_images(batch_paths)
+        inputs = processor(images=images, return_tensors="pt")
         inputs = {key: value.to(device) for key, value in inputs.items()}
         with torch.no_grad():
             outputs = model(**inputs)
         embeddings = _embedding_from_outputs(outputs, output_attr="image_embeds")
         return embeddings.cpu().numpy()
 
+    image_paths = df[image_path_column].astype(str).tolist()
     embeddings = []
-    print(f"Processing {len(images)} images for split {split}...")
-    for i in tqdm(range(0, len(images), batch_size), desc=split):
-        embeddings.append(embed_img_batch(images[i : i + batch_size]))
+    print(f"Processing {len(image_paths)} images from {csv_file_path}...")
+    for i in tqdm(range(0, len(image_paths), batch_size)):
+        embeddings.append(embed_image_batch(image_paths[i : i + batch_size]))
 
     embeddings = np.vstack(embeddings)
-    embeddings_path = output_dir / f"{output_prefix}_{split}_embeddings.npy"
-    labels_path = output_dir / f"{output_prefix}_{split}_labels.npy"
+    embeddings_path = output_dir / f"{output_prefix}_embeddings.npy"
+    labels_path = output_dir / f"{output_prefix}_labels.npy"
     np.save(embeddings_path, embeddings)
     np.save(labels_path, labels)
-    mapping_path = save_label_mapping(output_dir / f"{output_prefix}_{split}_label_mapping.json", class_labels)
+    mapping_path = save_label_mapping(output_dir / f"{output_prefix}_label_mapping.json", class_labels)
 
-    print(f"{split} image embeddings saved: {embeddings_path} shape={embeddings.shape}")
-    print(f"{split} labels saved: {labels_path} shape={labels.shape}")
-    print(f"{split} label mapping saved: {mapping_path}")
+    print(f"Image embeddings saved: {embeddings_path} shape={embeddings.shape}")
+    print(f"Labels saved: {labels_path} shape={labels.shape}")
+    print(f"Label mapping saved: {mapping_path}")
     return embeddings_path, labels_path
 
 

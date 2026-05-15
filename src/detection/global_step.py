@@ -12,7 +12,6 @@ from models import CleanModel
 def global_step(
     state: DetectionState,
     n_iterations: int,
-    confidence_threshold: float = 1,
     num_epochs: int = 200,
     seed: int = 2025,
 ) -> CleanModel | None:
@@ -85,22 +84,17 @@ def global_step(
         )
 
         indices_to_keep_as_noisy = []
-        high_confidence_noisy = 0
-        pred_labels, pred_confidences = clean_model.predict(x_test)
+        pred_labels, _ = clean_model.predict(x_test)
 
         for i, original_df_index in enumerate(current_noisy_indices):
             current_label = y_test[i].item()
             predicted_label = pred_labels[i].item()
-            confidence = pred_confidences[i].item()
 
             if predicted_label != current_label:
                 indices_to_keep_as_noisy.append(original_df_index)
-                if confidence >= confidence_threshold:
-                    high_confidence_noisy += 1
 
         print(
-            f"Iteration {iteration + 1}: Kept {len(indices_to_keep_as_noisy)} suspected noisy labels. "
-            f"{high_confidence_noisy} have confidence >= {confidence_threshold}."
+            f"Iteration {iteration + 1}: Kept {len(indices_to_keep_as_noisy)} suspected noisy labels."
         )
 
         state.detected_noisy_indices = np.array(indices_to_keep_as_noisy)

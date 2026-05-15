@@ -1,93 +1,55 @@
-# Relabeler
+# RELABELER: A Data-Centric Framework for Detecting and Correcting Corrupted Labels
+RELABELER is an end-to-end, data-centric framework for detecting and correcting corrupted labels. 
 
-Relabeler is an end-to-end pipeline for detecting and correcting label noise:
+# Architecture
 
-```text
-raw data -> embeddings -> detection phase -> correction phase -> corrected labels
-```
+The figure shows the overview of RELABELER, which consists of two main phases: (i) corrupted label detection and (ii) corrupted label correction.
 
-The detection phase has a local step and a global step. It only identifies suspected noisy labels; label changes are applied by the correction phase.
+For corrupted label detection, RELABELER jointly leverages both local and global relationships among data instances to identify potentially noisy samples. 
 
-## Project Structure
+After detecting suspicious instances, RELABELER further performs label correction by estimating the most probable clean label for each instance based on both its input features and observed noisy label.
 
-```text
-Relabeler/
-├── artifacts/
-│   ├── models/              # checkpoint and model artifacts
-│   └── outputs/             # run outputs, generated embeddings, corrected labels
-├── configs/                 # optional config files
-├── data/
-│   └── raw/                 # raw CSV, image dataset references, or code jsonl data
-├── scripts/
-│   └── run_relabeler.py     # local wrapper for the package CLI
-├── src/
-│   ├── cli.py               # command-line entrypoint
-│   ├── correction/          # correction phase label updates
-│   ├── core/                # pipeline orchestration and utilities
-│   ├── data_preprocessing/  # data loading, embedding extraction, synthetic noise
-│   ├── detection/           # detection phase local/global steps
-│   ├── evaluation/          # metrics
-│   └── models/              # neural network modules
-├── pyproject.toml
-├── requirements.txt
-└── README.md
-```
-
-## Installation
+# Quick Start
+## Prepare Environment
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-For Mac/CPU environments, use `faiss-cpu` as listed in `requirements.txt`. On Kaggle/GPU environments, install a FAISS GPU build that matches the CUDA runtime if needed.
+## Running
 
-
-## Run From Raw CSV Text
-
-The CSV file must contain a text column and a label column. The default column names are `text` and `label`.
+### Run on Text Data
 
 ```bash
 python3 scripts/run_relabeler.py \
   --raw-csv-path data/raw/sarcasm_data.csv \
   --text-column text \
   --label-column label \
-  --embedding-model-name bert-base-uncased \
-  --embedding-batch-size 32 \
   --noise-config '{"sym": 0.4}' \
-  --k-neighbors 30 \
-  --n-iterations -1 \
-  --detection-threshold 0.9 \
-  --correction-threshold 0.9 \
-  --output-dir artifacts/outputs/sarcasm_run \
+  --output-dir artifacts/outputs/text_run \
   --model-dir artifacts/models
 ```
 
-## Run From Hugging Face Image Dataset
-
-Image input uses a Hugging Face dataset split. By default, images are read from `image`, labels are read from `label`, and embeddings are generated with CLIP.
+### Run on Image Data
 
 ```bash
 python3 scripts/run_relabeler.py \
-  --image-dataset-name beans \
-  --image-split train \
-  --image-column image \
-  --image-label-column labels \
-  --embedding-model-name openai/clip-vit-base-patch32 \
-  --embedding-batch-size 32 \
+  --raw-image-csv-path data/raw/images.csv \
+  --image-path-column image_path \
+  --image-label-column label \
   --noise-config '{"sym": 0.4}' \
-  --k-neighbors 30 \
-  --n-iterations -1 \
-  --detection-threshold 0.9 \
-  --correction-threshold 0.9 \
-  --output-dir artifacts/outputs/image_train_run \
+  --output-dir artifacts/outputs/image_run \
   --model-dir artifacts/models
 ```
 
-## Run From Raw Code JSONL
-
-The input directory must contain jsonl split files such as `train.jsonl`, `valid.jsonl`, and `test.jsonl`. By default, code is read from `func` and labels are read from `target`; override these with `--code-column` and `--code-label-column` for other schemas.
+### Run on Code Data
 
 ```bash
 python3 scripts/run_relabeler.py \
@@ -95,23 +57,22 @@ python3 scripts/run_relabeler.py \
   --code-split train \
   --code-column func \
   --code-label-column target \
-  --embedding-model-name microsoft/codebert-base \
-  --embedding-batch-size 16 \
   --noise-config '{"sym": 0.4}' \
-  --k-neighbors 30 \
-  --n-iterations -1 \
-  --detection-threshold 0.9 \
-  --correction-threshold 0.9 \
-  --output-dir artifacts/outputs/code_train_run \
+  --output-dir artifacts/outputs/code_run \
   --model-dir artifacts/models
 ```
 
-## Output
+### Outputs
 
-Each run writes results to `--output-dir`:
+Each run writes the corrected labels and intermediate embeddings to `--output-dir`:
 
-- `final_corrected_labels.csv`
-- `embeddings/` when the input is raw CSV, image, or raw code jsonl data
-- `*_label_mapping.json` files that map encoded labels back to the original labels
+```text
+artifacts/outputs/<run_name>/
+├── final_corrected_labels.csv
+└── embeddings/
+    ├── *_embeddings.npy
+    ├── *_labels.npy
+    └── *_label_mapping.json
+```
 
-Temporary checkpoints and model artifacts are written to `--model-dir`.
+Temporary model checkpoints are written to `--model-dir`.

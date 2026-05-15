@@ -10,8 +10,8 @@ def parse_args():
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--raw-csv-path", help="Path to raw text CSV. The pipeline will embed it before Relabeler.")
     input_group.add_argument(
-        "--image-dataset-name",
-        help="Hugging Face image dataset name. The pipeline will embed one split before Relabeler.",
+        "--raw-image-csv-path",
+        help="Path to raw image CSV. The CSV must contain an image path column and a label column.",
     )
     input_group.add_argument(
         "--code-jsonl-data-dir",
@@ -20,9 +20,8 @@ def parse_args():
 
     parser.add_argument("--text-column", default="text", help="Text column for --raw-csv-path.")
     parser.add_argument("--label-column", default="label", help="Label column for --raw-csv-path.")
-    parser.add_argument("--image-column", default="image", help="Image column for --image-dataset-name.")
-    parser.add_argument("--image-label-column", default="label", help="Label column for --image-dataset-name.")
-    parser.add_argument("--image-split", default="train", help="Image dataset split to run through Relabeler.")
+    parser.add_argument("--image-path-column", default="image_path", help="Image path column for --raw-image-csv-path.")
+    parser.add_argument("--image-label-column", default="label", help="Label column for --raw-image-csv-path.")
     parser.add_argument("--code-column", default="func", help="Code/input column for --code-jsonl-data-dir.")
     parser.add_argument("--code-label-column", default="target", help="Label column for --code-jsonl-data-dir.")
     parser.add_argument("--code-split", default="train", help="Code jsonl split to run through Relabeler.")
@@ -31,7 +30,7 @@ def parse_args():
         default=None,
         help=(
             "Embedding model. Defaults to bert-base-uncased for CSV, "
-            "openai/clip-vit-base-patch32 for image, and microsoft/codebert-base for code jsonl."
+            "openai/clip-vit-base-patch32 for image CSV, and microsoft/codebert-base for code jsonl."
         ),
     )
     parser.add_argument("--embedding-batch-size", type=int, default=32)
@@ -47,7 +46,6 @@ def parse_args():
     parser.add_argument("--k-neighbors", type=int, default=30)
     parser.add_argument("--n-iterations", type=int, default=-1)
     parser.add_argument("--global-epochs", type=int, default=200)
-    parser.add_argument("--detection-threshold", type=float, default=0.9)
     parser.add_argument("--correction-threshold", type=float, default=0.9)
     parser.add_argument("--output-dir", default="artifacts/outputs")
     parser.add_argument("--model-dir", default="artifacts/models")
@@ -64,13 +62,12 @@ def main():
 
     run_relabeler(
         raw_csv_path=args.raw_csv_path,
-        image_dataset_name=args.image_dataset_name,
+        raw_image_csv_path=args.raw_image_csv_path,
         code_jsonl_data_dir=args.code_jsonl_data_dir,
         text_column=args.text_column,
         label_column=args.label_column,
-        image_column=args.image_column,
+        image_path_column=args.image_path_column,
         image_label_column=args.image_label_column,
-        image_split=args.image_split,
         code_column=args.code_column,
         code_label_column=args.code_label_column,
         code_split=args.code_split,
@@ -83,7 +80,6 @@ def main():
         seed=args.seed,
         k_neighbors=args.k_neighbors,
         n_iterations=args.n_iterations,
-        detection_confidence_threshold=args.detection_threshold,
         correction_confidence_threshold=args.correction_threshold,
         global_epochs=args.global_epochs,
         output_dir=args.output_dir,
